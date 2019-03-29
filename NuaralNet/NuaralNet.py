@@ -78,7 +78,7 @@ def matrixMul(mat1, mat2):
     return
 
 input = matrix([16], ("mono", 2))
-input_h1 = matrix([32,16], ("mono", -1))
+input_h1 = matrix([32,16], ("random", -1, 1))
 
 visualizeMatrix(input)
 visualizeMatrix(input_h1)
