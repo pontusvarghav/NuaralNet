@@ -1,17 +1,13 @@
 import random
 import math
 import copy
+import tensorflow as tf
+
 def listMul(list):
     ValueCount = 1;                                             # Total number of enteties in Matrix
     for i in list:                                             
         ValueCount = ValueCount * i
     return(ValueCount)
-def listMul(list1, list2):
-    flatlist1 = flattern(list1)
-    flatlist2 = flattern(list2)
-    retList = []
-    for i in range(flatlist[1][0]):
-        retList.append
 
 def flattern(mat):
     retMat = mat[0]
@@ -142,13 +138,13 @@ def network(layerConfig, valueConfig, functionConfig):
 def actFunc(functionConfig):
     functions = {"sigmoid": (lambda x : 1 / (1 + math.e**(-x)))}
     return(functions[functionConfig.lower()])
-def actDir(functionConfig):
+def actDer(functionConfig):
     functions = {"sigmoid": (lambda x : (math.e**x) / (1 + math.e**x)**2)}
     return(functions[functionConfig.lower()])
 def costFunc(functionConfig):
     functions = {"abs": (lambda x, y: abs(x-y)), "square": (lambda x, y: (x-y)**2)}
     return(functions[functionConfig])
-def costDir(functionConfig):
+def costDer(functionConfig):
     functions = {"abs": (lambda x, y: (x-y)/abs(x-y)), "square": (lambda x, y: 2*(x-y))}
     return(functions[functionConfig])
 
@@ -185,23 +181,95 @@ def matCost(mat1, mat2, functionConfig):
             retMat.append(costFunc(functionConfig)(flatMat1[0][i], flatMat2[0][i]))
         return([shape([retMat, flatMat1[1]], mat1[1]), functionConfig])
     return
-def getDir(net, results, y, costFunc):
-    biasDir = []
-    weightDir = []
-    for i in range(len(results)):
-        index = len(results) - i -1
+def diag(mat1):
+    if(len(mat1[1]) == 1):
+        retMat = []
+        for i in range(mat1[1][0]):
+            row = []
+            for i2 in range(mat1[1][0]):
+                if(i == i2):
+                    row.append(mat1[0][i])
+                else:
+                    row.append(0)
+            retMat.append(row)
+        return([retMat, [mat1[1][0], mat1[1][0]]])
+    return
+def getDer(net, results, y, costFunc):
+    biasDer = []
+    weightDer = []
+    for i in range(len(results)-1):
+        index = len(results) - i - 1
         if(i == 0):
-            costDirList = list(map(costDir(costFunc),results[index][0], y))                                     # d(cost) / d(last node output)
+            NodeOutputDer = list(map(costDer(costFunc),results[index][0], y))                                           # d(cost) / d(last node output)
+        else:
+            NodeOutputDer = flattern(matrixMul(net["weights"][index], shape(biasDer[0], [1, biasDer[0][1][0]])))[0]
+        actDerList = [list(map(actDer(net["functionConfig"]), results[index][0])), results[index][1]]                   # d(ActivationInput) / d(ActivationOutput)
+        biasDer.insert(0, matrixMul(actDerList, diag([NodeOutputDer, [len(NodeOutputDer)]])))                           # d(cost) / d(bias)
 
-            biasDir.insert(0, [list(map(actDir(net["functionConfig"]), costDirList)), results[index][1]])       # d(cost) / d(bias)
-            for row in net["weights"]:
-                
-            weightDir.insert(0, matrixMul(results[index], shape(biasDir[0], [1, biasDir[0][1][0]])))            # d(cost / d(weight))
-            xd=2
-net = network([3,[5,3],2], ["random", -1,1], "sigmoid")
-results = runNetwork([2,3,4],net)
-cost = matCost(results[-1], [0.5,0.5], "square")
-getDir(net,results, [0.5,0.5], "square")
-a = matrix([2,2], ["mono", 0.5])
-b = matAct(a, "sigmoid")
+        tempWeightDer = []                                                                                                                                                                    
+        for prevNode in results[index-1][0]:
+            tempRowDer = []
+            for nextNodeDer in biasDer[0][0]:                       
+                tempRowDer.append(prevNode*nextNodeDer)                                                                 # [d(nextNode) / d(weight))] * [d(cost) / d(nextNode)]
+            tempWeightDer.append(tempRowDer)
+        weightDer.insert(0, [tempWeightDer, net["weights"][index-1][1]])                                                # d(cost) / d(weight)    
+    return({"biasDer":biasDer, "weightDer":weightDer})
+def adjustNet(net, der):
+    for i in range(len(der["weightDer"])):
+        weightDer = flattern(der["weightDer"][i])
+        change = shape([list(map((lambda x : -0.001 if x > 0.2 else 0.01 if x < -0.2 else 0), weightDer[0])), weightDer[1]], der["weightDer"][i][1])
+        net["weights"][i] = matrixAdd(change, net["weights"][i])
+    for i in range(len(der["biasDer"])):
+        change = [list(map((lambda x : 0 if x == 0 else 0.0001 if x < 0 else -0.0001), der["biasDer"][i][0])), der["biasDer"][i][1]]
+        net["biases"][i] = matrixAdd(change, net["biases"][i])
+def averageList(list):
+    sum = 0
+    for i in list:
+        sum = sum + i
+    return(sum/len(list))
+def int2LayerOutput(value, length):
+    retList = [0]*length
+    retList[value] = 1
+    return(retList)
+def biggiestIntInList(list):
+    x = 0
+    y = 0
+    for i in range(len(list)):
+        if(list[i] > x):
+            x = list[i]
+            y = i
+    return(y)
+imgs = tf.keras.datasets.mnist
+(x_train, y_train), (x_test, y_test) = imgs.load_data()
+
+x_train = tf.keras.utils.normalize(x_train, axis=1)
+x_test = tf.keras.utils.normalize(x_test, axis=1)
+
+net = network([784,[15,6],10], ["random", -1,1], "sigmoid")
+for i in range(len(x_train)):
+    inputValue = []
+    for i2 in x_train[i]:
+        row = []
+        for i3 in i2:
+            row.append(i3)
+        inputValue.append(row)
+    results = runNetwork(flattern([inputValue, [28,28]]),net)
+    
+    y = int2LayerOutput(y_train[i], 10)
+    cost = matCost(results[-1], y, "square")
+    resultPrint = []
+    for i4 in results[-1][0]:
+        resultPrint.append("%.5f" % i4)
+
+    print(averageList(cost[0][0]), "\t", resultPrint, "\t", y_train[i], "\t", biggiestIntInList(results[-1][0])) 
+
+    
+    c = getDer(net, results, y, "square")
+    adjustNet(net, c)
+  
+
+
+
+
+
 jens = 2
