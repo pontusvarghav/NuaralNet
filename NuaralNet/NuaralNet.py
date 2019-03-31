@@ -1,11 +1,18 @@
 import random
 import math
-
+import copy
 def listMul(list):
     ValueCount = 1;                                             # Total number of enteties in Matrix
     for i in list:                                             
         ValueCount = ValueCount * i
     return(ValueCount)
+def listMul(list1, list2):
+    flatlist1 = flattern(list1)
+    flatlist2 = flattern(list2)
+    retList = []
+    for i in range(flatlist[1][0]):
+        retList.append
+
 def flattern(mat):
     retMat = mat[0]
     for i in range(len(mat[1]) - 1):
@@ -66,33 +73,35 @@ def visualizeMatrix(mat):
             print()
     return()
 def matrixMul(mat1, mat2):
-    if(len(mat1[1]) >= len(mat2[1])):                                   # Finding highest dimention matrix and ajdusting the other one to fit it
-        matDim = len(mat1[1])
-        for i in range(matDim-len(mat2[1])):
-            mat2[0] = [mat2[0]]
-            mat2[1].append(1)
+    mat1_ = copy.deepcopy(mat1)
+    mat2_ = copy.deepcopy(mat2)
+    if(len(mat1_[1]) >= len(mat2_[1])):                                   # Finding highest dimention matrix and ajdusting the other one to fit it
+        matDim = len(mat1_[1])
+        for i in range(matDim-len(mat2_[1])):
+            mat2_[0] = [mat2_[0]]
+            mat2_[1].append(1)
     else:
-        matDim = len(mat2[1])
-        for i in range(matDim-len(mat1[1])):
-            mat1[0] = [mat1[0]]
-            mat1[1].append(1)
-    if(mat1[1][0] != mat2[1][1]):
+        matDim = len(mat2_[1])
+        for i in range(matDim-len(mat1_[1])):
+            mat1_[0] = [mat1_[0]]
+            mat1_[1].append(1)
+    if(mat1_[1][0] != mat2_[1][1]):
         return
 
-    if(matDim == 2):                                                    # Making sure the matrix is 2D
+    if(matDim == 2):                                                        # Making sure the matrix is 2D
         RetMat = []
-        for row1 in range(mat1[1][1]):                                  # Matrix multiplication 
-            row = []
-            for column2 in range(mat2[1][0]):
+        for row1 in range(mat1_[1][1]):                                     # Matrix multiplication 
+            row = []                                                    
+            for column2 in range(mat2_[1][0]):
                 sum = 0
-                for column1 in range(mat1[1][0]):
-                    sum = sum + mat1[0][row1][column1] * mat2[0][column1][column2]
+                for column1 in range(mat1_[1][0]):
+                    sum = sum + mat1_[0][row1][column1] * mat2_[0][column1][column2]
                 row.append(sum)
             RetMat.append(row)
-        if(mat1[1][1] == 1):
-            return([RetMat[0], [mat2[1][0]]])
+        if(mat1_[1][1] == 1):
+            return([RetMat[0], [mat2_[1][0]]])
         else:
-            return([RetMat, (mat2[1][0], mat1[1][1])])
+            return([RetMat, (mat2_[1][0], mat1_[1][1])])
     return
 def matrixAdd(mat1,mat2):
     if(mat1[1] == mat2[1]):
@@ -129,9 +138,20 @@ def network(layerConfig, valueConfig, functionConfig):
 
     network = {"biases": biases, "weights": weights, "functionConfig": functionConfig}
     return(network)
+
 def actFunc(functionConfig):
     functions = {"sigmoid": (lambda x : 1 / (1 + math.e**(-x)))}
     return(functions[functionConfig.lower()])
+def actDir(functionConfig):
+    functions = {"sigmoid": (lambda x : (math.e**x) / (1 + math.e**x)**2)}
+    return(functions[functionConfig.lower()])
+def costFunc(functionConfig):
+    functions = {"abs": (lambda x, y: abs(x-y)), "square": (lambda x, y: (x-y)**2)}
+    return(functions[functionConfig])
+def costDir(functionConfig):
+    functions = {"abs": (lambda x, y: (x-y)/abs(x-y)), "square": (lambda x, y: 2*(x-y))}
+    return(functions[functionConfig])
+
 def matAct(mat, functionConfig):
     flatMat = flattern(mat)
     func = actFunc(functionConfig)
@@ -149,10 +169,9 @@ def runNetwork(inputs, net):
         nodes = matrixAdd(nodes, biases[i])
         nodes = matAct(nodes, functionConfig)
         runValues.append(nodes)
-    return(runValues)
-def costFunc(functionConfig):
-    functions = {"abs": (lambda x, y: abs(x-y)), "square": (lambda x, y: (x-y)**2)}
-    return(functions[functionConfig])
+        
+    return(runValues) 
+
 def matCost(mat1, mat2, functionConfig):
     if(not isinstance(mat1[0], (list,))):
         mat1 = [mat1, [len(mat1)]]
@@ -164,14 +183,25 @@ def matCost(mat1, mat2, functionConfig):
         retMat = []
         for i in range(flatMat1[1][0]):
             retMat.append(costFunc(functionConfig)(flatMat1[0][i], flatMat2[0][i]))
-        return(shape([retMat, flatMat1[1]], mat1[1]))
+        return([shape([retMat, flatMat1[1]], mat1[1]), functionConfig])
     return
+def getDir(net, results, y, costFunc):
+    biasDir = []
+    weightDir = []
+    for i in range(len(results)):
+        index = len(results) - i -1
+        if(i == 0):
+            costDirList = list(map(costDir(costFunc),results[index][0], y))                                     # d(cost) / d(last node output)
 
-
+            biasDir.insert(0, [list(map(actDir(net["functionConfig"]), costDirList)), results[index][1]])       # d(cost) / d(bias)
+            for row in net["weights"]:
+                
+            weightDir.insert(0, matrixMul(results[index], shape(biasDir[0], [1, biasDir[0][1][0]])))            # d(cost / d(weight))
+            xd=2
 net = network([3,[5,3],2], ["random", -1,1], "sigmoid")
 results = runNetwork([2,3,4],net)
 cost = matCost(results[-1], [0.5,0.5], "square")
-
+getDir(net,results, [0.5,0.5], "square")
 a = matrix([2,2], ["mono", 0.5])
 b = matAct(a, "sigmoid")
 jens = 2
